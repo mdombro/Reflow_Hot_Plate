@@ -2,4 +2,4 @@ class SerialHandler:
     def __init__(self):
         pass
     def run(self):
-        pass
+        print("Testing Serial")
