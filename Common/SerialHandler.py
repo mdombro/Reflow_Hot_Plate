@@ -1,32 +1,36 @@
 import serial
 import sys
 import glob
-from multiprocessing import Manager
 
 class SerialHandler:
-    def __init__(self, uC_to_pc, pc_to_uC, processMessages, shutdown):
+    def __init__(self, uC_to_pc, pc_to_uC, processMessagePipe, shutdown):
         self.ser = ''
-        self.processMessages = processMessages
+        self.processMessagePipe = processMessagePipe
         self.shutdown = shutdown
         self.uC_to_pc = uC_to_pc
         self.pc_to_uC = pc_to_uC
-        #self.ser = serial.Serial(self.portname, 9600, timeout=1.0)
 
     def readLine(self):
         return self.serObj.readline()
 
     def init(self):
         ports = self.serial_ports()
-        self.processMessages['serial']['portList'] = ports
-        while self.processMessages['serial']['portSelected'] == '':
-            pass
-        port = self.processMessages['serial']['portSelected']
+        print(ports)
+        self.processMessagePipe.send({'type': 'portList',
+                                      'data': ports})
+        portM = self.processMessagePipe.recv()
+        port = portM['data']
+        print(port)
         try:
             self.connect(port)
         except serial.serialutil.SerialException:
-            self.processMessages['serial']['connectionError'] = True
+            self.processMessagePipe.send({'type': 'connectionStatues',
+                                          'data': 'connectionError'})
             self.init()
         else:
+            self.processMessagePipe.send({'type': 'connectionStatus',
+                                          'data': 'connected'})
+            self.serObj.write(b'Hello')
             self.run()
 
     def connect(self, port):
@@ -70,10 +74,9 @@ class SerialHandler:
                 pass
         return result
 
-def runSerial(uC_to_pc, pc_to_uC, processMessages, shutdown):
-    print('called function')
-    print(processMessages)
-    serObj = SerialHandler(uC_to_pc, pc_to_uC, processMessages, shutdown)
+def runSerial(uC_to_pc, pc_to_uC, processMessagePipe, shutdown):
+    print('here')
+    serObj = SerialHandler(uC_to_pc, pc_to_uC, processMessagePipe, shutdown)
     serObj.init()
 
 

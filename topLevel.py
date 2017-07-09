@@ -16,7 +16,7 @@ def main():
         # PID puts, SerialHandler gets, and then sends to uC
     pc_to_uC = Queue()
     pc_to_uC.cancel_join_thread()
-    serialMessagePipe = Pipe()
+    serialMessageParent, serialMessageChild = Pipe()
     pidMessagePipe = Pipe()
 
     # M A N A G E R
@@ -29,27 +29,26 @@ def main():
                                  'portSelected': '',
                                  'connFail': False,
                                  'connectionError': False}
-    print('Top level')
-    print(processMessages)
 
 
 
     # P R O C E S S E S
     SHUTDOWN = Event()
     processes = []
-    SerialCommProc = Process(target=runSerial, args=(uC_to_pc, pc_to_uC, processMessages, SHUTDOWN))
-    PIDProc = Process(target=runPID, args=(uC_to_pc, pc_to_uC, processMessages, SHUTDOWN))
+    SerialCommProc = Process(target=runSerial, args=(uC_to_pc, pc_to_uC, serialMessageChild, SHUTDOWN))
+    PIDProc = Process(target=runPID, args=(uC_to_pc, pc_to_uC, pidMessagePipe, SHUTDOWN))
     processes.append((SerialCommProc, SHUTDOWN))
     processes.append((PIDProc, SHUTDOWN))
+    SerialCommProc.start()
+    PIDProc.start()
 
     # G U I
     app = QApplication(sys.argv)
-    window = TempControl(serialMessagePipe, pidMessagePipe)
+    window = TempControl(serialMessageParent, pidMessagePipe)
     window.show()
 
-    SerialCommProc.start()
-    PIDProc.start()
     app.exec_()
+    SHUTDOWN.set()
 
     for _, S in processes:
         S.set()
