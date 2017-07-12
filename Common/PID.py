@@ -2,5 +2,5 @@ class PID:
     def __init__(self):
         pass
 
-def runPID(uC_to_pc, pc_to_uC, pidMessages, SHUTDOWN):
-    print("testing PID")
+def runPID(PID_to_serial_PID_side, GUI_to_PID_PID_side, SHUTDOWN):
+    pass #print("testing PID")

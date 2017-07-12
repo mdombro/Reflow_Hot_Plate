@@ -1,14 +1,15 @@
 import serial
 import sys
 import glob
+import time
 
 class SerialHandler:
-    def __init__(self, uC_to_pc, pc_to_uC, processMessagePipe, shutdown):
+    def __init__(self, serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, shutdown):
         self.ser = ''
-        self.processMessagePipe = processMessagePipe
+        self.to_gui_messages = serial_to_GUI_serial_side
+        self.to_pid_messages = serial_to_PID_serial_side
+        self.from_pid_messages = PID_to_serial_serial_side
         self.shutdown = shutdown
-        self.uC_to_pc = uC_to_pc
-        self.pc_to_uC = pc_to_uC
 
     def readLine(self):
         return self.serObj.readline()
@@ -16,21 +17,22 @@ class SerialHandler:
     def init(self):
         ports = self.serial_ports()
         print(ports)
-        self.processMessagePipe.send({'type': 'portList',
+        self.to_gui_messages.send({'type': 'portList',
                                       'data': ports})
-        portM = self.processMessagePipe.recv()
+        portM = self.to_gui_messages.recv()
         port = portM['data']
         print(port)
         try:
             self.connect(port)
         except serial.serialutil.SerialException:
-            self.processMessagePipe.send({'type': 'connectionStatues',
+            self.to_gui_messages.send({'type': 'connectionStatus',
                                           'data': 'connectionError'})
             self.init()
         else:
-            self.processMessagePipe.send({'type': 'connectionStatus',
+            self.to_gui_messages.send({'type': 'connectionStatus',
                                           'data': 'connected'})
             self.serObj.write(b'Hello')
+            time.sleep(0.2)
             self.run()
 
     def connect(self, port):
@@ -40,9 +42,14 @@ class SerialHandler:
     def run(self):
         while not self.shutdown.is_set():
             data = self.readLine()
-            self.uC_to_pc.put(data)
-            dutyCycle = self.pc_to_uC.get()
-            self.serObj.write(b'H' + dutyCycle)
+            print(data)
+            dataPacket = {'type': 'tempReading',
+                          'data': data}
+            self.to_pid_messages.send(dataPacket)
+            self.to_gui_messages.send(dataPacket)
+            # TODO: uncomment these lines
+            #dutyCycle = self.from_pid_messages.recv()
+            #self.serObj.write(b'H' + dutyCycle)
 
     # https://stackoverflow.com/questions/12090503/listing-available-com-ports-with-python
     # finds existing ports on the system
@@ -74,9 +81,8 @@ class SerialHandler:
                 pass
         return result
 
-def runSerial(uC_to_pc, pc_to_uC, processMessagePipe, shutdown):
-    print('here')
-    serObj = SerialHandler(uC_to_pc, pc_to_uC, processMessagePipe, shutdown)
+def runSerial(serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, SHUTDOWN):
+    serObj = SerialHandler(serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, SHUTDOWN)
     serObj.init()
 
 
