@@ -43,6 +43,7 @@ class SerialHandler:
         while not self.shutdown.is_set():
             data = self.readLine()
             print(data)
+            data = data[0:2]
             dataPacket = {'type': 'tempReading',
                           'data': data}
             self.to_pid_messages.send(dataPacket)

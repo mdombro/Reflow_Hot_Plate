@@ -42,8 +42,22 @@
 #include "USART_driver.h"
 #include "PWM_driver.h"
 
+volatile char dataReadyFlag;
+volatile char buffer[BUFFER_SIZE];
+volatile char ind;
+
 ISR(TIMER1_COMPA_vect) {
 	TOGGLE;
+}
+
+ISR(USART_RX_vect) {
+	char d = UDR0;
+	buffer[ind] = d;
+	ind++;
+	if (d == '\n') {
+		dataReadyFlag = 1;
+		ind = 0;
+	}
 }
 
 void SPI_MasterInit(void) {
@@ -78,6 +92,11 @@ int main(void) {
 	char temp_s[10] = {'\n'};
 	uint32_t temp = 0;
 	
+	dataReadyFlag = 0;
+	ind = 0;
+	clearString(buffer, BUFFER_SIZE);
+	clearString(string, BUFFER_SIZE);
+	
 	/********* Config bits and inits ******************/
 	// Enable OCR1A output pin on PB1, !SS as output
 	DDRB |= _BV(PB1) | _BV(PB2); 
@@ -90,8 +109,14 @@ int main(void) {
 	sei();
 	
     while (1) {
-		clearString(string, BUFFER_SIZE);
-		getString(string);
+		if (dataReadyFlag) {
+			dataReadyFlag = 0;
+			strcpy(string, buffer);
+			clearString(buffer, BUFFER_SIZE);
+			//putString(string);
+		}
+		//clearString(string, BUFFER_SIZE);
+		//getString(string);
 		switch (string[0]) {
 			case 'H':
 				sentHeaterDC_old = sentHeaterDC;
@@ -122,6 +147,7 @@ int main(void) {
 		temp_s[3] = (uint8_t)(temp);
 		temp_s[4] = 0;
 		putString(temp_s);
+		_delay_ms(100);
     }
 }
 

@@ -127,8 +127,11 @@ class TempControl(QMainWindow):
             t = self.serialMessages.recv()
             if t['type'] == 'tempReading':
                 temp = int.from_bytes(t['data'][0:2], byteorder='big')
+                temp = temp>>2
+                temp *= 0.25
             print('Thread', temp)
             self.accum.append(temp)
             p1.setData(self.accum, pen='b', symbol='o', symbolPen=None, symbolSize=4, symbolBrush=('b'))
+            self.currentTemp.setText(str(temp))
 
 
