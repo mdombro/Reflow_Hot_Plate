@@ -45,3 +45,12 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+
+Debug/
+.pyc
+.atsln
+.xml
+.atsuo
+__pycache__/
+*.xml
+uC Code/Hot Plate v0.atsln

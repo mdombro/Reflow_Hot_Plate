@@ -8,6 +8,7 @@ import numpy as np
 import threading
 
 class TempControl(QMainWindow):
+    signalNewTemp = pyqtSignal(float)
     def __init__(self, GUI_to_PID_GUI_side, serial_to_GUI_GUI_side):
         super().__init__()
         self.centralWidget = QWidget()
@@ -19,6 +20,7 @@ class TempControl(QMainWindow):
         self.buttonFontSize = 14
         self.startStopFontSize = 24
         self.accum = []
+        self.signalNewTemp.connect(self.updatePlot)
         self.startGUI()
 
     def startGUI(self):
@@ -68,7 +70,7 @@ class TempControl(QMainWindow):
         spacer = QSpacerItem(10, 40, QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.menus.addItem(spacer)
 
-        self.currentTempInd = QLabel('Current Temp')
+        self.currentTempInd = QLabel('Current Temp °C:')
         self.currentTempInd.setFont(QtGui.QFont("Times", self.infoFontSize, QtGui.QFont.Bold))
         self.currentTemp = QLabel('0.00')
         self.currentTemp.setFont(QtGui.QFont("Times", self.infoFontSize, QtGui.QFont.Bold))
@@ -104,8 +106,16 @@ class TempControl(QMainWindow):
         #                                      #
         ########################################
         #self.p1temp = self.pwin.addPlot(title='Basic Test', y = np.random.normal(size=100))
-        self.p1temp = self.pwin.addPlot(title='Basic Test')
+        self.p1temp = self.pwin.addPlot(title='<font size="100">Plate Temperature and Thermal Profile</font>', labels={'left':'<font size="100"> Temperature °C</font>', 'bottom':'<font size="100">Time</font>'})
+        self.p1temp.setYRange(0, 250)
+        self.p1temp.setMouseEnabled(x=False, y=False)
+        self.p1 = self.p1temp.plot(pen='y')
 
+
+    def updatePlot(self, temp):
+        self.accum.append(temp)
+        self.p1.setData(self.accum, pen='y')
+        self.currentTemp.setText(str(temp))
 
     def connectuC(self):
         self.port = self.portComboBox.currentText()
@@ -118,20 +128,25 @@ class TempControl(QMainWindow):
         else:
             self.statusLabel.setText('Connected!')
             print('Connected!')
-            threading.Thread(target=self.serialWatcher, name='serialWatcher').start()
+            threading.Thread(target=serialWatcher, name='serialWatcher', args=(self.signalNewTemp, self.serialMessages)).start()
 
 
-    def serialWatcher(self):
-        p1 = self.p1temp.plot(pen='y')
-        while True:
-            t = self.serialMessages.recv()
-            if t['type'] == 'tempReading':
-                temp = int.from_bytes(t['data'][0:2], byteorder='big')
-                temp = temp>>2
-                temp *= 0.25
-            print('Thread', temp)
-            self.accum.append(temp)
-            p1.setData(self.accum, pen='b', symbol='o', symbolPen=None, symbolSize=4, symbolBrush=('b'))
-            self.currentTemp.setText(str(temp))
+def serialWatcher(signalNewTemp, serialMessages):
+    temp = 0
+    tempLast = temp
+    while True:
+        t = serialMessages.recv()
+        print(t)
+        if t['type'] == 'tempReading':
+            temp = int.from_bytes(t['data'][0:2], byteorder='big')
+            temp = temp>>2
+            temp *= 0.25
+            tempLast = temp
+            signalNewTemp.emit(temp)
+        else:
+            temp = tempLast
+        # Todo: check for a fault message, set status bar to Fault!, maybe try and keep track/hold temp to keep PID running
+        # while below some timeout condition, then send everything a shutdown (µC especially)
+        print('Read temp: ', temp)
 
 

@@ -31,7 +31,6 @@ class SerialHandler:
         else:
             self.to_gui_messages.send({'type': 'connectionStatus',
                                           'data': 'connected'})
-            self.serObj.write(b'Hello')
             time.sleep(0.2)
             self.run()
 
@@ -41,11 +40,15 @@ class SerialHandler:
 
     def run(self):
         while not self.shutdown.is_set():
-            data = self.readLine()
-            print(data)
-            data = data[0:2]
-            dataPacket = {'type': 'tempReading',
-                          'data': data}
+            print('alive')
+            data = self.serObj.readline()
+            if data[0] == 84:
+                data = data[1:3]
+                dataPacket = {'type': 'tempReading',
+                              'data': data}
+            else:
+                dataPacket = {'type': 'readError',
+                              'data': b'\x00\x00'}
             self.to_pid_messages.send(dataPacket)
             self.to_gui_messages.send(dataPacket)
             # TODO: uncomment these lines

@@ -141,13 +141,14 @@ int main(void) {
 		PORTD |= _BV(PD4);
 		PORTB |= _BV(PB2);
 		clearString(temp_s, 10);
-		temp_s[0] = (uint8_t)(temp>>24);
-		temp_s[1] = (uint8_t)(temp>>16);
-		temp_s[2] = (uint8_t)(temp>>8);
-		temp_s[3] = (uint8_t)(temp);
-		temp_s[4] = 0;
+		temp_s[0] = 'T';
+		temp_s[1] = (uint8_t)(temp>>24);
+		temp_s[2] = (uint8_t)(temp>>16);
+		temp_s[3] = (uint8_t)(temp>>8);
+		temp_s[4] = (uint8_t)(temp);
+		temp_s[5] = '\n';
 		putString(temp_s);
-		_delay_ms(100);
+		_delay_ms(50);
     }
 }
 
