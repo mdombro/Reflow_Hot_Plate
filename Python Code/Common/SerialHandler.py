@@ -2,6 +2,7 @@ import serial
 import sys
 import glob
 import time
+import threading
 
 class SerialHandler:
     def __init__(self, serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, shutdown):
@@ -39,8 +40,11 @@ class SerialHandler:
         self.serObj = serial.Serial(port, 9600, timeout=1.0)
 
     def run(self):
+        self.listenerThread = threading.Thread(target=self.listener, name='serialListener').start()
+        self.talkerThread = threading.Thread(target=self.talker, name='serialTalker').start()
+
+    def listener(self):
         while not self.shutdown.is_set():
-            print('alive')
             data = self.serObj.readline()
             if data[0] == 84:
                 data = data[1:3]
@@ -51,9 +55,14 @@ class SerialHandler:
                               'data': b'\x00\x00'}
             self.to_pid_messages.send(dataPacket)
             self.to_gui_messages.send(dataPacket)
-            # TODO: uncomment these lines
-            #dutyCycle = self.from_pid_messages.recv()
-            #self.serObj.write(b'H' + dutyCycle)
+            time.sleep(0.05)
+
+    def talker(self):
+        while not self.shutdown.is_set():
+            dutyCycle = self.from_pid_messages.recv()
+            self.serObj.write(b'H' + dutyCycle)
+            time.sleep(0.05)
+
 
     # https://stackoverflow.com/questions/12090503/listing-available-com-ports-with-python
     # finds existing ports on the system

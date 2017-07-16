@@ -20,7 +20,7 @@ def main():
     SHUTDOWN = Event()
     processes = []
     SerialCommProc = Process(target=runSerial, args=(serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, SHUTDOWN))
-    PIDProc = Process(target=runPID, args=(PID_to_serial_PID_side, GUI_to_PID_PID_side, SHUTDOWN))
+    PIDProc = Process(target=runPID, args=(PID_to_serial_PID_side, serial_to_PID_PID_side, GUI_to_PID_PID_side, SHUTDOWN))
     processes.append((SerialCommProc, SHUTDOWN))
     processes.append((PIDProc, SHUTDOWN))
     SerialCommProc.start()
