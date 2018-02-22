@@ -10,7 +10,7 @@
 *  - First byte is a header dictating message type						*
 *  - Second byte is data for that message, stored as raw binary			*
 *		so that no string-to-int conversion is needed					*
-*  - (For temp reading) Third byte combines with 2nd to form				*
+*  - (For temp reading) Third byte combines with 2nd to form			*
 *		16-bit temp reading. MSB sent first.							*
 *																		*	
 *  Message Types:  1) (H)eater - (Rx) Sets duty cycle for hot plate		*
@@ -33,6 +33,7 @@
 #define TOGGLE		PINB |= (1<<PINB1)
 
 #define BUFFER_SIZE 30
+#define SEND_STRING_SIZE 10
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -89,8 +90,9 @@ int main(void) {
 	unsigned char sentHeaterDC = 0;
 	unsigned char sentHeaterDC_old = 0;
 	char fanState = 0;
-	char temp_s[10] = {'\n'};
+	char send_string[SEND_STRING_SIZE] = {'\n'};
 	uint32_t temp = 0;
+	uint8_t connectStatus = 0; 
 	
 	dataReadyFlag = 0;
 	ind = 0;
@@ -121,33 +123,53 @@ int main(void) {
 			case 'H':
 				sentHeaterDC_old = sentHeaterDC;
 				sentHeaterDC = string[1];
+				clearString(string, BUFFER_SIZE);
 				break;
 			case 'F':
 				fanState = string[1];
+				clearString(string, BUFFER_SIZE);
+				break;
+			case 'A':
+				connectStatus = 1;
+				send_string[0] = 'R';
+				send_string[1] = '\n';
+				for (int i = 0; i<3; i++) {
+					putString(send_string);	
+					_delay_ms(1);
+				}
+				clearString(send_string, SEND_STRING_SIZE);
+				clearString(string, BUFFER_SIZE);
+				break;
+			case 'S':
+				connectStatus = 0;
+				clearString(send_string, SEND_STRING_SIZE);
+				clearString(string, BUFFER_SIZE);
 				break;
 		}
 		if (sentHeaterDC != sentHeaterDC_old)
 			updatePWM((uint16_t)sentHeaterDC*80);
-		PORTD &= ~_BV(PD4);
-		PORTB &= ~_BV(PB2);
-		//_delay_us(1);
-		temp = (uint32_t)SPI_ReceiveByte();
-		temp <<= 8;
-		temp |= (uint32_t)SPI_ReceiveByte();
-		temp <<= 8;
-		temp |= (uint32_t)SPI_ReceiveByte();
-		temp <<= 8;
-		temp |= (uint32_t)SPI_ReceiveByte();
-		PORTD |= _BV(PD4);
-		PORTB |= _BV(PB2);
-		clearString(temp_s, 10);
-		temp_s[0] = 'T';
-		temp_s[1] = (uint8_t)(temp>>24);
-		temp_s[2] = (uint8_t)(temp>>16);
-		temp_s[3] = (uint8_t)(temp>>8);
-		temp_s[4] = (uint8_t)(temp);
-		temp_s[5] = '\n';
-		putString(temp_s);
+		if (connectStatus) {
+			PORTD &= ~_BV(PD4);
+			PORTB &= ~_BV(PB2);
+			//_delay_us(1);
+			temp = (uint32_t)SPI_ReceiveByte();
+			temp <<= 8;
+			temp |= (uint32_t)SPI_ReceiveByte();
+			temp <<= 8;
+			temp |= (uint32_t)SPI_ReceiveByte();
+			temp <<= 8;
+			temp |= (uint32_t)SPI_ReceiveByte();
+			PORTD |= _BV(PD4);
+			PORTB |= _BV(PB2);
+			clearString(send_string, SEND_STRING_SIZE);
+			send_string[0] = 'T';
+			send_string[1] = (uint8_t)(temp>>24);
+			send_string[2] = (uint8_t)(temp>>16);
+			send_string[3] = (uint8_t)(temp>>8);
+			send_string[4] = (uint8_t)(temp);
+			send_string[5] = '\n';
+			putString(send_string);
+		}
 		_delay_ms(50);
     }
 }

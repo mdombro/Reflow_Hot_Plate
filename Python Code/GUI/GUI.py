@@ -6,6 +6,7 @@ import serial
 import pyqtgraph as pg
 import numpy as np
 import threading
+import csv
 
 class TempControl(QMainWindow):
     signalNewTemp = pyqtSignal(float)
@@ -59,6 +60,10 @@ class TempControl(QMainWindow):
         self.connectButton.clicked.connect(self.connectuC)
         self.connectButton.setFont(QtGui.QFont("Times", self.infoFontSize, QtGui.QFont.Bold))
         self.menus.addWidget(self.connectButton)
+        self.loadProfile = QPushButton('Load Profile Curve')
+        self.loadProfile.clicked.connect(self.loadProfileMethod)
+        self.loadProfile.setFont(QtGui.QFont("Times", self.infoFontSize, QtGui.QFont.Bold))
+        self.menus.addWidget(self.loadProfile)
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
         self.statusLabel = QLabel('')
@@ -110,6 +115,7 @@ class TempControl(QMainWindow):
         self.p1temp.setYRange(0, 250)
         self.p1temp.setMouseEnabled(x=False, y=False)
         self.p1 = self.p1temp.plot(pen='y')
+        self.p2 = self.p1temp.plot(pen='r')
 
 
     def updatePlot(self, temp):
@@ -130,13 +136,56 @@ class TempControl(QMainWindow):
             print('Connected!')
             threading.Thread(target=serialWatcher, name='serialWatcher', args=(self.signalNewTemp, self.serialMessages)).start()
 
+    def loadProfileMethod(self):
+        fileName, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                  "All Files (*);;Python Files (*.py)")
+        if fileName:
+            try:
+                file = open(fileName, 'r', newline='')
+                reader = csv.reader(file, delimiter=',')
+                temperatures = []
+                timeStamps = []
+                lastTime = 0
+                for i, row in enumerate(reader):
+                    if '#' in row[0]:
+                        continue
+                    if int(row[1]) < lastTime:
+                        self.statusLabel.setText("Sorry your csv cannot go back in time, please choose another one or edit it first")
+                    lastTime = int(row[1])
+                    temperatures.append(int(row[0]))
+                    timeStamps.append(int(row[1]))
+                interval = 0.25
+                setTemps = []
+                subTimeStamps = []
+                for i, t in enumerate(temperatures):
+                    if i == len(temperatures) - 1:
+                        break
+                    times = np.arange(timeStamps[i], timeStamps[i + 1], interval)
+                    temps = np.linspace(t, temperatures[i + 1], len(times))
+                    if i != len(temperatures) - 2:
+                        setTemps = np.append(setTemps, temps[:-1])
+                        subTimeStamps = np.append(subTimeStamps, times[:-1])
+                    else:
+                        setTemps = np.append(setTemps, temps)
+                        subTimeStamps = np.append(subTimeStamps, times)
+                self.setTemps = setTemps
+                self.subTimeStamps = subTimeStamps
+                print(setTemps)
+                print(subTimeStamps)
+                file.close()
+                self.statusLabel.setText("Successfully loaded profile!")
+                self.p2.setData(self.subTimeStamps, self.setTemps)
+            except:
+                self.statusLabel.setText("Sorry, there was an error reading the file!")
+        else:
+            self.statusLabel.setText("Sorry, could not open that file!")
 
 def serialWatcher(signalNewTemp, serialMessages):
     temp = 0
     tempLast = temp
     while True:
         t = serialMessages.recv()
-        print(t)
+        #print(t)
         if t['type'] == 'tempReading':
             temp = int.from_bytes(t['data'][0:2], byteorder='big')
             temp = temp>>2
@@ -147,6 +196,6 @@ def serialWatcher(signalNewTemp, serialMessages):
             temp = tempLast
         # Todo: check for a fault message, set status bar to Fault!, maybe try and keep track/hold temp to keep PID running
         # while below some timeout condition, then send everything a shutdown (µC especially)
-        print('Read temp: ', temp)
+        #print('Read temp: ', temp)
 
 

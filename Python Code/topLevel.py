@@ -17,12 +17,13 @@ def main():
     GUI_to_PID_GUI_side, GUI_to_PID_PID_side = Pipe()
 
     # P R O C E S S E S
+    global SHUTDOWN
     SHUTDOWN = Event()
     processes = []
     SerialCommProc = Process(target=runSerial, args=(serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, SHUTDOWN))
     PIDProc = Process(target=runPID, args=(PID_to_serial_PID_side, serial_to_PID_PID_side, GUI_to_PID_PID_side, SHUTDOWN))
-    processes.append((SerialCommProc, SHUTDOWN))
-    processes.append((PIDProc, SHUTDOWN))
+    processes.append(SerialCommProc)
+    processes.append(PIDProc)
     SerialCommProc.start()
     PIDProc.start()
 
@@ -33,10 +34,10 @@ def main():
 
     app.exec_()
     SHUTDOWN.set()
+    for p in processes:
+        p.terminate()
 
-    for _, S in processes:
-        S.set()
-    for p, _ in processes:
+    for p in processes:
         p.join()
 
 if __name__ == '__main__':

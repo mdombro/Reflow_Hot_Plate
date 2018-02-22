@@ -3,6 +3,7 @@ import sys
 import glob
 import time
 import threading
+from Common.Errors import WrongDeviceError
 
 class SerialHandler:
     def __init__(self, serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, shutdown):
@@ -25,7 +26,20 @@ class SerialHandler:
         print(port)
         try:
             self.connect(port)
-        except serial.serialutil.SerialException:
+            # The idea is to send down a query and then receive an expected response. This will let the handler know that
+            # it is talking to the temp controller and not some other device. This way if you hit the wrong port the program
+            # won't error out
+            #self.to_gui_messages.send({'type': 'deviceID',
+            #                        'data': 'A'})
+            self.serObj.flushInput()
+            self.serObj.write(b'A\n')
+            data = self.serObj.readline(2)
+            if len(data) != 0:
+                if data[0] != 82:  # 'R' ascii code
+                    raise WrongDeviceError()
+            else:
+                raise WrongDeviceError()
+        except (serial.serialutil.SerialException, WrongDeviceError):
             self.to_gui_messages.send({'type': 'connectionStatus',
                                           'data': 'connectionError'})
             self.init()
@@ -58,11 +72,12 @@ class SerialHandler:
             time.sleep(0.05)
 
     def talker(self):
+        print(self.shutdown.is_set())
+        print(self.shutdown,"at inner serial")
         while not self.shutdown.is_set():
             dutyCycle = self.from_pid_messages.recv()
-            self.serObj.write(b'H' + dutyCycle)
+            self.serObj.write(b'H' + dutyCycle + b'\n')
             time.sleep(0.05)
-
 
     # https://stackoverflow.com/questions/12090503/listing-available-com-ports-with-python
     # finds existing ports on the system
@@ -95,7 +110,10 @@ class SerialHandler:
         return result
 
 def runSerial(serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, SHUTDOWN):
+    print(SHUTDOWN, "at serial")
     serObj = SerialHandler(serial_to_GUI_serial_side, serial_to_PID_serial_side, PID_to_serial_serial_side, SHUTDOWN)
     serObj.init()
+    while not SHUTDOWN.is_set():
+        pass
 
 
